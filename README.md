@@ -20,7 +20,7 @@ Dieses Repository enthält den R-Code der stochastischen Mikrosimulation, die de
 ## Struktur
 
 ```
-├── Fortschreibung_E+V_BA_GR_n5000_template für BA.R   # Kern-Simulationsscript (ein Lauf)
+├── Mikrosimulation_BA_GR_n5000_template für BA.R   # Kern-Simulationsscript (ein Lauf)
 │
 ├── WATT Scripts/
 │   ├── generate_BA_scripts.R       # Erzeugt 600 Scripts + run_BA_GR_600.sh
