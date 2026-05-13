@@ -62,4 +62,4 @@ mce_mean <- mce_df |>
             .groups  = "drop")
 
 cat("\nMCE je N (Min / Mittelwert / Max über alle Stichtage):\n")
-print(mce_mean)
+print(mce_mean |> mutate(across(starts_with("MCE"), \(x) round(x, 3))))
