@@ -56,8 +56,10 @@ mce_df <- df |>
 mce_mean <- mce_df |>
   group_by(N) |>
   summarise(m_Laeufe = mean(m) |> round() |> as.integer(),
-            MCE_mean  = mean(MCE),
-            .groups   = "drop")
+            MCE_min  = min(MCE),
+            MCE_mean = mean(MCE),
+            MCE_max  = max(MCE),
+            .groups  = "drop")
 
-cat("\nMCE (gemittelt über alle Stichtage):\n")
+cat("\nMCE je N (Min / Mittelwert / Max über alle Stichtage):\n")
 print(mce_mean)
