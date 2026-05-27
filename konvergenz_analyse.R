@@ -246,7 +246,8 @@ plot_long <- bind_rows(
                          lo = snv_lo, hi = snv_hi)
 )
 
-mw_data     <- plot_data |> select(n, stichtag_label, mw)
+mw_data  <- plot_data |> select(n, stichtag_label, mw)
+mw_label <- mw_data |> filter(n == min(n))
 n_stab_perc <- max(stab$n_stabil,     na.rm = TRUE)
 n_stab_snv  <- max(stab_snv$n_stabil, na.rm = TRUE)
 
@@ -263,6 +264,9 @@ p <- ggplot(plot_long, aes(x = n)) +
   geom_line(aes(y = hi, color = methode), linewidth = 0.7) +
   geom_line(data = mw_data, aes(y = mw), color = "black",
             linewidth = 0.6) +
+  geom_text(data = mw_label, aes(x = n, y = mw, label = "MW"),
+            hjust = 1.2, vjust = -0.3, size = 2.8,
+            family = "Arial", color = "black") +
   geom_vline(xintercept = n_stab_snv,  linetype = "dotted",
              color = "#e07b39", linewidth = 0.7) +
   geom_vline(xintercept = n_stab_perc, linetype = "dashed",
@@ -279,6 +283,7 @@ p <- ggplot(plot_long, aes(x = n)) +
     color   = "Konfidenzintervalle",
     caption = caption_txt
   ) +
+  coord_cartesian(clip = "off") +
   theme_minimal(base_size = 11, base_family = "Arial") +
   theme(
     legend.position  = "bottom",
@@ -295,3 +300,8 @@ p <- ggplot(plot_long, aes(x = n)) +
 plot_path <- file.path(OUT_DIR, "hzp_konvergenz_plot.png")
 ggsave(plot_path, plot = p, width = 16, height = 8, units = "cm", dpi = 300)
 cat(sprintf("Plot gespeichert: %s\n", plot_path))
+
+# Daten für separate Plots speichern
+saveRDS(list(perc = perc, stab = stab, stab_snv = stab_snv),
+        file.path(OUT_DIR, "konvergenz_daten.rds"))
+cat(sprintf("RDS gespeichert: %s\n", file.path(OUT_DIR, "konvergenz_daten.rds")))
