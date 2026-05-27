@@ -305,3 +305,71 @@ cat(sprintf("Plot gespeichert: %s\n", plot_path))
 saveRDS(list(perc = perc, stab = stab, stab_snv = stab_snv),
         file.path(OUT_DIR, "konvergenz_daten.rds"))
 cat(sprintf("RDS gespeichert: %s\n", file.path(OUT_DIR, "konvergenz_daten.rds")))
+
+
+# ── Reduzierte Konvergenztabelle ──────────────────────────────────────────────
+n_sel_red <- c(seq(50, 650, 50), 1000, 2000, 3000, 4000, 5000)
+
+tbl_red <- perc |>
+  filter(n %in% n_sel_red, stichtag %in% STICHTAGE) |>
+  mutate(
+    jahr   = substr(stichtag, 1, 4),
+    snv_s  = gsub("\\.", ",", sprintf("[%.2f; %.2f]", snv_lo * 100, snv_hi * 100)),
+    perc_s = gsub("\\.", ",", sprintf("[%.2f; %.2f]", p025   * 100, p975   * 100))
+  ) |>
+  select(n, jahr, snv_s, perc_s) |>
+  pivot_wider(names_from  = jahr,
+              values_from = c(snv_s, perc_s),
+              names_glue  = "{.value}_{jahr}") |>
+  left_join(wanduhr_df |> rename(laufzeit_h = wanduhrzeit_h), by = "n") |>
+  select(n, laufzeit_h,
+         all_of(as.vector(rbind(paste0("snv_s_",  2024:2035),
+                                paste0("perc_s_", 2024:2035)))))
+
+tbl_red_snv <- tbl_red |>
+  select(n, laufzeit_h, all_of(paste0("snv_s_",  2024:2035))) |>
+  rename_with(~ sub("^snv_s_",  "SNV-KI ",       .x), starts_with("snv_s_")) |>
+  rename("Laufzeit (h)" = laufzeit_h)
+
+tbl_red_perc <- tbl_red |>
+  select(n, laufzeit_h, all_of(paste0("perc_s_", 2024:2035))) |>
+  rename_with(~ sub("^perc_s_", "Perzentil-KI ", .x), starts_with("perc_s_")) |>
+  rename("Laufzeit (h)" = laufzeit_h)
+
+# KI bei jahresspezifischem n_stab
+ki_per_year <- function(stab_df, lo_col, hi_col) {
+  stab_df |>
+    select(stichtag, n_stabil) |>
+    left_join(perc |> select(stichtag, n, all_of(c(lo_col, hi_col))),
+              by = c("stichtag", "n_stabil" = "n")) |>
+    mutate(
+      jahr = substr(stichtag, 1, 4),
+      ki_s = gsub("\\.", ",", sprintf("[%.2f; %.2f]",
+                                     .data[[lo_col]] * 100,
+                                     .data[[hi_col]] * 100))
+    ) |>
+    select(jahr, n_stabil, ki_s)
+}
+
+tbl_nstab <- ki_per_year(stab_snv, "snv_lo", "snv_hi") |>
+  rename("n_stab (SNV)" = n_stabil, "SNV-KI" = ki_s) |>
+  left_join(
+    ki_per_year(stab, "p025", "p975") |>
+      rename("n_stab (Perc)" = n_stabil, "Perzentil-KI" = ki_s),
+    by = "jahr"
+  ) |>
+  rename(Jahr = jahr)
+
+red_path <- file.path(OUT_DIR, "hzp_konvergenz_tabelle_reduziert.xlsx")
+tryCatch(
+  {
+    write_xlsx(list(SNV       = tbl_red_snv,
+                    Perzentil = tbl_red_perc,
+                    nstab_KI  = tbl_nstab),
+               path = red_path)
+    cat(sprintf("Reduzierte Tabelle gespeichert: %s\n", red_path))
+  },
+  error = function(e) cat(sprintf(
+    "\nReduzierte Tabelle NICHT gespeichert (Datei evtl. geöffnet): %s\n",
+    conditionMessage(e)))
+)
