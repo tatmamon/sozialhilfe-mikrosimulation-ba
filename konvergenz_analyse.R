@@ -234,8 +234,13 @@ plot_long <- bind_rows(
 
 mw_data  <- plot_data |> select(n, stichtag_label, mw)
 mw_label <- mw_data |> filter(n == min(n))
-n_stab_perc <- max(stab$n_stabil,     na.rm = TRUE)
-n_stab_snv  <- max(stab_snv$n_stabil, na.rm = TRUE)
+
+vline_perc <- stab |>
+  filter(stichtag %in% c("2024-07-01", "2035-07-01")) |>
+  mutate(stichtag_label = ifelse(stichtag == "2024-07-01", "Stichjahr 2024", "Stichjahr 2035"))
+vline_snv <- stab_snv |>
+  filter(stichtag %in% c("2024-07-01", "2035-07-01")) |>
+  mutate(stichtag_label = ifelse(stichtag == "2024-07-01", "Stichjahr 2024", "Stichjahr 2035"))
 
 farben <- setNames(c("#2c5f8a", "#e07b39"), c(lbl_perc, lbl_snv))
 
@@ -253,10 +258,10 @@ p <- ggplot(plot_long, aes(x = n)) +
   geom_text(data = mw_label, aes(x = n, y = mw, label = "MW"),
             hjust = 1.2, vjust = -0.3, size = 2.8,
             family = "Arial", color = "black") +
-  geom_vline(xintercept = n_stab_snv,  linetype = "dotted",
-             color = "#e07b39", linewidth = 0.7) +
-  geom_vline(xintercept = n_stab_perc, linetype = "dashed",
-             color = "#2c5f8a", linewidth = 0.7) +
+  geom_vline(data = vline_snv,  aes(xintercept = n_stabil),
+             linetype = "dotted", color = "#e07b39", linewidth = 0.7) +
+  geom_vline(data = vline_perc, aes(xintercept = n_stabil),
+             linetype = "dashed", color = "#2c5f8a", linewidth = 0.7) +
   facet_wrap(~stichtag_label, scales = "free_y") +
   scale_x_continuous(breaks = seq(0, 1000, 200)) +
   scale_y_continuous(labels = \(x) paste0(round(x * 100, 1), " %")) +
