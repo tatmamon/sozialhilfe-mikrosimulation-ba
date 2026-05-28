@@ -1,7 +1,7 @@
 # Konvergenzanalyse der HzP-Quote – Perzentil-Stabilität & SNV-basiertes KI
 # Empirisches KI: [q2.5; q97.5] über kumulative Läufe
 # SNV-basiertes KI: mean ± 1.96 × SD  (θ̂ ± C × √V(θ̂), McClelland)
-# Kriterium: max. Änderung ≤ 0,001 zwischen aufeinanderfolgenden Prüfpunkten
+# Kriterium: Δ ≤ 0,001 für K=5 aufeinanderfolgende Prüfpunkte (Hoad et al. 2010)
 # Prüfpunkte: alle 50 Läufe bis n=5000
 
 library(tidyverse)
@@ -14,6 +14,8 @@ OUT_DIR   <- paste0("C:/Users/tmamantova/Desktop/DAK Sozialhilfe Modell/",
 
 STICHTAGE <- paste0(2024:2035, "-07-01")
 SCHRITT   <- 50L
+DELTA_THR <- 0.001   # Stabilitätsschwelle
+K_CONFIRM <- 5L      # Bestätigungsfenster (Hoad et al. 2010)
 
 # ── Daten einlesen ────────────────────────────────────────────────────────────
 files <- sort(list.files(DATA_DIR,
@@ -121,30 +123,38 @@ cat("HzP-Konvergenztabelle (p025 = lo_, p975 = hi_, Dezimal):\n\n")
 print(tabelle, n = Inf)
 
 
-# ── Stabilitätsprüfung: ab welchem n ist die Änderung ≤ 0,001 (3. NK)? ────────
-# Kriterium: für alle aufeinanderfolgenden Prüfpunkte ab n* gilt
-#   |p025(n+50) - p025(n)| ≤ 0,001  UND  |p975(n+50) - p975(n)| ≤ 0,001
-cat("\n── Stabilität (max. Änderung ≤ 0,001 zwischen Prüfpunkten) ──\n")
+# ── Stabilitätsfunktion: K aufeinanderfolgende Prüfpunkte ≤ Schwelle ─────────
+# Hoad, Robinson, Davies (2010): erst nach K=5 konsekutiven Bestätigungen stabil
+stab_run <- function(df, lo_col, hi_col) {
+  df |>
+    group_by(stichtag) |>
+    arrange(n) |>
+    mutate(
+      delta_lo = abs(.data[[lo_col]] - lag(.data[[lo_col]])),
+      delta_hi = abs(.data[[hi_col]] - lag(.data[[hi_col]])),
+      ok = !is.na(delta_lo) &
+             (delta_lo <= DELTA_THR) & (delta_hi <= DELTA_THR)
+    ) |>
+    filter(!is.na(delta_lo)) |>
+    summarise(
+      n_stabil = {
+        ok_v <- ok; n_v <- n; m <- length(ok_v)
+        result <- NA_integer_
+        for (i in seq_len(max(0L, m - K_CONFIRM + 1L))) {
+          if (all(ok_v[i:(i + K_CONFIRM - 1L)])) {
+            result <- n_v[i]; break
+          }
+        }
+        result
+      },
+      lo_n5000 = sprintf("%.3f", last(.data[[lo_col]])),
+      hi_n5000 = sprintf("%.3f", last(.data[[hi_col]])),
+      .groups = "drop"
+    )
+}
 
-stab <- perc |>
-  group_by(stichtag) |>
-  arrange(n) |>
-  mutate(
-    delta_lo = abs(p025 - lag(p025)),
-    delta_hi = abs(p975 - lag(p975)),
-    ok = (delta_lo <= 0.001) & (delta_hi <= 0.001)
-  ) |>
-  filter(!is.na(ok)) |>
-  summarise(
-    n_stabil = {
-      last_bad <- max(c(0L, n[!ok]))
-      n[n > last_bad][1L]
-    },
-    lo_n5000 = sprintf("%.3f", p025[n == max(n)]),
-    hi_n5000 = sprintf("%.3f", p975[n == max(n)]),
-    .groups = "drop"
-  )
-
+cat("\n── Stabilität Perzentil (Δ ≤ 0,001, K=5 Bestätigungen) ──\n")
+stab <- stab_run(perc, "p025", "p975")
 print(stab)
 
 
@@ -169,27 +179,8 @@ cat("\nSNV-Konvergenztabelle (mean ± 1.96·SD, lo_ / hi_, Dezimal):\n\n")
 print(tabelle_snv, n = Inf)
 
 # ── SNV-Stabilitätsprüfung ────────────────────────────────────────────────────
-cat("\n── SNV-Stabilität (max. Änderung ≤ 0,001 zwischen Prüfpunkten) ──\n")
-
-stab_snv <- perc |>
-  group_by(stichtag) |>
-  arrange(n) |>
-  mutate(
-    delta_lo = abs(snv_lo - lag(snv_lo)),
-    delta_hi = abs(snv_hi - lag(snv_hi)),
-    ok = (delta_lo <= 0.001) & (delta_hi <= 0.001)
-  ) |>
-  filter(!is.na(ok)) |>
-  summarise(
-    n_stabil = {
-      last_bad <- max(c(0L, n[!ok]))
-      n[n > last_bad][1L]
-    },
-    lo_n5000 = sprintf("%.3f", snv_lo[n == max(n)]),
-    hi_n5000 = sprintf("%.3f", snv_hi[n == max(n)]),
-    .groups = "drop"
-  )
-
+cat("\n── Stabilität SNV (Δ ≤ 0,001, K=5 Bestätigungen) ──\n")
+stab_snv <- stab_run(perc, "snv_lo", "snv_hi")
 print(stab_snv)
 
 
