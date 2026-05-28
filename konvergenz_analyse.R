@@ -123,34 +123,29 @@ cat("HzP-Konvergenztabelle (p025 = lo_, p975 = hi_, Dezimal):\n\n")
 print(tabelle, n = Inf)
 
 
-# ── Stabilitätsfunktion: K aufeinanderfolgende Prüfpunkte ≤ Schwelle ─────────
-# Hoad, Robinson, Davies (2010): erst nach K=5 konsekutiven Bestätigungen stabil
+# ── Stabilitätsfunktion: Fenster-vom-Referenzpunkt (Hoad et al. 2010) ────────
+# n_stab = erstes n_v[i], für das gilt: ALLE K nachfolgenden Prüfpunkte
+# weichen von Referenzpunkt i um <= DELTA_THR ab (lo UND hi)
 stab_run <- function(df, lo_col, hi_col) {
-  df |>
-    group_by(stichtag) |>
-    arrange(n) |>
-    mutate(
-      delta_lo = abs(.data[[lo_col]] - lag(.data[[lo_col]])),
-      delta_hi = abs(.data[[hi_col]] - lag(.data[[hi_col]])),
-      ok = !is.na(delta_lo) &
-             (delta_lo <= DELTA_THR) & (delta_hi <= DELTA_THR)
-    ) |>
-    filter(!is.na(delta_lo)) |>
-    summarise(
-      n_stabil = {
-        ok_v <- ok; n_v <- n; m <- length(ok_v)
-        result <- NA_integer_
-        for (i in seq_len(max(0L, m - K_CONFIRM + 1L))) {
-          if (all(ok_v[i:(i + K_CONFIRM - 1L)])) {
-            result <- n_v[i]; break
-          }
-        }
-        result
-      },
-      lo_n5000 = sprintf("%.3f", last(.data[[lo_col]])),
-      hi_n5000 = sprintf("%.3f", last(.data[[hi_col]])),
-      .groups = "drop"
-    )
+  map_dfr(unique(df$stichtag), function(st) {
+    sub  <- df |> filter(stichtag == st) |> arrange(n)
+    lo_v <- sub[[lo_col]]
+    hi_v <- sub[[hi_col]]
+    n_v  <- sub$n
+    m    <- length(n_v)
+    result <- NA_integer_
+    for (i in seq_len(max(0L, m - K_CONFIRM))) {
+      refs <- (i + 1L):(i + K_CONFIRM)   # K Folge-Indizes nach Referenz i
+      if (all(abs(lo_v[refs] - lo_v[i]) <= DELTA_THR) &&
+          all(abs(hi_v[refs] - hi_v[i]) <= DELTA_THR)) {
+        result <- n_v[i]; break
+      }
+    }
+    tibble(stichtag = st,
+           n_stabil = result,
+           lo_n5000 = sprintf("%.3f", lo_v[m]),
+           hi_n5000 = sprintf("%.3f", hi_v[m]))
+  })
 }
 
 cat("\n── Stabilität Perzentil (Δ ≤ 0,001, K=5 Bestätigungen) ──\n")
