@@ -1,7 +1,7 @@
 # Konvergenzanalyse der HzP-Quote – Perzentil-Stabilität & SNV-basiertes KI
 # Empirisches KI: [q2.5; q97.5] über kumulative Läufe
 # SNV-basiertes KI: mean ± 1.96 × SD  (θ̂ ± C × √V(θ̂), McClelland)
-# Kriterium: Δ ≤ 0,001 für K=5 aufeinanderfolgende Prüfpunkte (Hoad et al. 2010)
+# Kriterium: |Δ| < 0,1 PP UND gleicher Ganzzahlanteil in % für K=5 Folge-Prüfpunkte (Hoad et al. 2010)
 # Prüfpunkte: alle 50 Läufe bis n=5000
 
 library(tidyverse)
@@ -12,10 +12,10 @@ DATA_DIR  <- paste0("C:/Users/tmamantova/Desktop/DAK Sozialhilfe Modell/",
 OUT_DIR   <- paste0("C:/Users/tmamantova/Desktop/DAK Sozialhilfe Modell/",
                     "Bachelorarbeit/Modellergebnisse/Konvergenzanalyse_5k")
 
-STICHTAGE <- paste0(2024:2035, "-07-01")
-SCHRITT   <- 50L
-DELTA_THR <- 0.001   # Stabilitätsschwelle
-K_CONFIRM <- 5L      # Bestätigungsfenster (Hoad et al. 2010)
+STICHTAGE   <- paste0(2024:2035, "-07-01")
+SCHRITT     <- 50L
+DELTA_THR   <- 0.001  # Schwellenwert: |Δ| < 0,001 (= 0,1 PP als Proportion)
+K_CONFIRM   <- 5L     # Bestätigungsfenster (Hoad et al. 2010)
 
 # ── Daten einlesen ────────────────────────────────────────────────────────────
 files <- sort(list.files(DATA_DIR,
@@ -124,8 +124,8 @@ print(tabelle, n = Inf)
 
 
 # ── Stabilitätsfunktion: Fenster-vom-Referenzpunkt (Hoad et al. 2010) ────────
-# n_stab = erstes n_v[i], für das gilt: ALLE K nachfolgenden Prüfpunkte
-# weichen von Referenzpunkt i um <= DELTA_THR ab (lo UND hi)
+# n_stab = erstes n_v[i], für das gilt: ALLE K nachfolgenden Prüfpunkte haben
+# denselben Ganzzahlanteil in % UND weichen um < DELTA_THR ab (lo UND hi)
 stab_run <- function(df, lo_col, hi_col) {
   map_dfr(unique(df$stichtag), function(st) {
     sub  <- df |> filter(stichtag == st) |> arrange(n)
@@ -136,8 +136,10 @@ stab_run <- function(df, lo_col, hi_col) {
     result <- NA_integer_
     for (i in seq_len(max(0L, m - K_CONFIRM))) {
       refs <- (i + 1L):(i + K_CONFIRM)   # K Folge-Indizes nach Referenz i
-      if (all(abs(lo_v[refs] - lo_v[i]) <= DELTA_THR) &&
-          all(abs(hi_v[refs] - hi_v[i]) <= DELTA_THR)) {
+      if (all(abs(lo_v[refs] - lo_v[i]) < DELTA_THR) &&
+          all(floor(lo_v[refs] * 100) == floor(lo_v[i] * 100)) &&
+          all(abs(hi_v[refs] - hi_v[i]) < DELTA_THR) &&
+          all(floor(hi_v[refs] * 100) == floor(hi_v[i] * 100))) {
         result <- n_v[i]; break
       }
     }
@@ -148,7 +150,7 @@ stab_run <- function(df, lo_col, hi_col) {
   })
 }
 
-cat("\n── Stabilität Perzentil (Δ ≤ 0,001, K=5 Bestätigungen) ──\n")
+cat("\n── Stabilität Perzentil (|Δ| < 0,001, K=5 Bestätigungen) ──\n")
 stab <- stab_run(perc, "p025", "p975")
 print(stab)
 
@@ -213,34 +215,28 @@ tryCatch(
 )
 
 
-# ── Konvergenzplot: Stichtage 2024 und 2035, n ≤ 1000 ────────────────────────
+# ── Konvergenzplot: alle Stichjahre, n ≤ 1000 ────────────────────────────────
 library(ggtext)
 
-# Legende-Labels (HTML für ggtext)
 lbl_perc <- "Perzentil [θ̂<sub>2,5</sub>; θ̂<sub>97,5</sub>]"
 lbl_snv  <- "auf der SNV basierte (θ̂ ± 1,96·SD)"
+lbl_mw   <- "Mittelwert"
 
 plot_data <- perc |>
-  filter(n <= 1000, stichtag %in% c("2024-07-01", "2035-07-01")) |>
-  mutate(stichtag_label = ifelse(stichtag == "2024-07-01",
-                                 "Stichjahr 2024", "Stichjahr 2035"))
+  filter(n <= 1000) |>
+  mutate(stichjahr = substr(stichtag, 1, 4))
 
 plot_long <- bind_rows(
-  plot_data |> transmute(n, stichtag_label, methode = lbl_perc,
-                         lo = p025, hi = p975),
-  plot_data |> transmute(n, stichtag_label, methode = lbl_snv,
-                         lo = snv_lo, hi = snv_hi)
+  plot_data |> transmute(n, stichjahr, methode = lbl_perc, lo = p025, hi = p975),
+  plot_data |> transmute(n, stichjahr, methode = lbl_snv,  lo = snv_lo, hi = snv_hi)
 )
 
-mw_data  <- plot_data |> select(n, stichtag_label, mw)
-mw_label <- mw_data |> filter(n == min(n))
+mw_data <- plot_data |>
+  select(n, stichjahr, mw) |>
+  mutate(methode = lbl_mw)
 
-vline_perc <- stab |>
-  filter(stichtag %in% c("2024-07-01", "2035-07-01")) |>
-  mutate(stichtag_label = ifelse(stichtag == "2024-07-01", "Stichjahr 2024", "Stichjahr 2035"))
-vline_snv <- stab_snv |>
-  filter(stichtag %in% c("2024-07-01", "2035-07-01")) |>
-  mutate(stichtag_label = ifelse(stichtag == "2024-07-01", "Stichjahr 2024", "Stichjahr 2035"))
+vline_perc <- stab     |> mutate(stichjahr = substr(stichtag, 1, 4))
+vline_snv  <- stab_snv |> mutate(stichjahr = substr(stichtag, 1, 4))
 
 farben <- setNames(c("#2c5f8a", "#e07b39"), c(lbl_perc, lbl_snv))
 
@@ -251,45 +247,45 @@ caption_txt <- paste0(
 
 p <- ggplot(plot_long, aes(x = n)) +
   geom_ribbon(aes(ymin = lo, ymax = hi, fill = methode), alpha = 0.25) +
-  geom_line(aes(y = lo, color = methode), linewidth = 0.7) +
-  geom_line(aes(y = hi, color = methode), linewidth = 0.7) +
-  geom_line(data = mw_data, aes(y = mw), color = "black",
-            linewidth = 0.6) +
-  geom_text(data = mw_label, aes(x = n, y = mw, label = "MW"),
-            hjust = 1.2, vjust = -0.3, size = 2.8,
-            family = "Arial", color = "black") +
+  geom_line(aes(y = lo, color = methode), linewidth = 0.6) +
+  geom_line(aes(y = hi, color = methode), linewidth = 0.6) +
+  geom_line(data = mw_data, aes(y = mw, linetype = methode),
+            color = "black", linewidth = 0.5) +
   geom_vline(data = vline_snv,  aes(xintercept = n_stabil),
-             linetype = "dotted", color = "#e07b39", linewidth = 0.7) +
+             linetype = "dotted", color = "#e07b39", linewidth = 0.6) +
   geom_vline(data = vline_perc, aes(xintercept = n_stabil),
-             linetype = "dashed", color = "#2c5f8a", linewidth = 0.7) +
-  facet_wrap(~stichtag_label, scales = "free_y") +
-  scale_x_continuous(breaks = seq(0, 1000, 200)) +
+             linetype = "dashed", color = "#2c5f8a", linewidth = 0.6) +
+  facet_wrap(~stichjahr, scales = "free_y", ncol = 4) +
+  scale_x_continuous(breaks = c(200, 600, 1000)) +
   scale_y_continuous(labels = \(x) paste0(round(x * 100, 1), " %")) +
-  scale_fill_manual(values  = farben) +
-  scale_color_manual(values = farben) +
+  scale_fill_manual(values  = farben, name = "Konfidenzintervalle") +
+  scale_color_manual(values = farben, name = "Konfidenzintervalle") +
+  scale_linetype_manual(values = setNames("solid", lbl_mw), name = NULL) +
+  guides(
+    linetype = guide_legend(order = 1),
+    fill     = guide_legend(order = 2),
+    color    = guide_legend(order = 2)
+  ) +
   labs(
     x       = "Anzahl Simulationsläufe (<i>n</i>)",
     y       = "HzP-Quote",
-    fill    = "Konfidenzintervalle",
-    color   = "Konfidenzintervalle",
     caption = caption_txt
   ) +
-  coord_cartesian(clip = "off") +
-  theme_minimal(base_size = 11, base_family = "Arial") +
+  theme_minimal(base_size = 9, base_family = "Arial") +
   theme(
     legend.position  = "bottom",
     strip.text       = element_text(face = "bold", family = "Arial"),
-    plot.caption     = element_markdown(size = 8, color = "gray40",
-                                        family = "Arial"),
+    plot.caption     = element_markdown(size = 7, color = "gray40", family = "Arial"),
     axis.title.x     = element_markdown(family = "Arial"),
     legend.text      = element_markdown(family = "Arial"),
     legend.title     = element_text(family = "Arial"),
-    axis.text        = element_text(family = "Arial"),
-    axis.title.y     = element_text(family = "Arial")
+    axis.text        = element_text(family = "Arial", size = 7),
+    axis.title.y     = element_text(family = "Arial"),
+    panel.spacing    = unit(0.4, "cm")
   )
 
 plot_path <- file.path(OUT_DIR, "hzp_konvergenz_plot.png")
-ggsave(plot_path, plot = p, width = 16, height = 8, units = "cm", dpi = 300)
+ggsave(plot_path, plot = p, width = 22, height = 18, units = "cm", dpi = 300)
 cat(sprintf("Plot gespeichert: %s\n", plot_path))
 
 # Daten für separate Plots speichern
