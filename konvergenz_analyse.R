@@ -295,7 +295,7 @@ cat(sprintf("RDS gespeichert: %s\n", file.path(OUT_DIR, "konvergenz_daten.rds"))
 
 
 # ── Reduzierte Konvergenztabelle ──────────────────────────────────────────────
-n_sel_red <- c(seq(50, 650, 50), 1000, 2000, 3000, 4000, 5000)
+n_sel_red <- c(seq(50, 650, 50), 700, 750, 1000, 2000, 3000, 4000, 5000)
 
 tbl_red <- perc |>
   filter(n %in% n_sel_red, stichtag %in% STICHTAGE) |>
