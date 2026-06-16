@@ -53,9 +53,16 @@ source("WATT Scripts/generate_n5000_5000runs.R")  # erzeugt Template + Bash-Scri
 **Schritt 3 — Konvergenzanalyse der HzP-Quote**
 
 ```r
-source("konvergenz_analyse.R")  # erzeugt Template + Bash-Script
-# → run_BA_GR_n5000_5000runs.sh auf dem Cluster ausführen (100 Batches à 50 parallel)
+source("konvergenz_analyse.R")
 ```
+
+Liest die 5.000 Referenzläufe aus Schritt 2 ein und erzeugt daraus:
+
+- `hzp_konvergenz_50er.xlsx` — Perzentil- und SNV-Konfidenzintervalle sowie Mittelwerte je Stichtag, kumulativ alle 50 Läufe
+- `hzp_konvergenz_tabelle_reduziert.xlsx` — verdichtete Tabelle (ausgewählte n) inkl. stichtagspezifischem n_stab
+- `hzp_perc_ki_mittelwerte.xlsx` — finale Tabelle mit Perzentil-KI und Mittelwert je Stichtag bei einheitlichem **n_stab = 500**
+- `hzp_konvergenz_plot.png` — Konvergenzplot (n ≤ 1.000)
+- `konvergenz_daten.rds` — Zwischendaten für weitere Auswertungen
 ---
 
 ## Voraussetzungen
