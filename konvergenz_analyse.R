@@ -360,3 +360,32 @@ tryCatch(
     "\nReduzierte Tabelle NICHT gespeichert (Datei evtl. geöffnet): %s\n",
     conditionMessage(e)))
 )
+
+
+# ── Finale Tabelle: Perzentil-KI & Mittelwert bei einheitlichem n_stab=500 ───
+# (konservativster Stichtag-spezifischer n_stab-Wert aus tbl_nstab)
+N_STAB_FIX <- 500L
+
+tbl_final <- perc |>
+  filter(n == N_STAB_FIX) |>
+  mutate(
+    Jahr        = substr(stichtag, 1, 4),
+    `Perzentil-KI` = gsub("\\.", ",", sprintf("[%.2f; %.2f]", p025 * 100, p975 * 100)),
+    Mittelwert  = gsub("\\.", ",", sprintf("%.2f", mw * 100))
+  ) |>
+  arrange(Jahr) |>
+  select(Jahr, `Perzentil-KI`, Mittelwert)
+
+final_path <- file.path(OUT_DIR, "hzp_perc_ki_mittelwerte.xlsx")
+tryCatch(
+  {
+    write_xlsx(
+      setNames(list(tbl_final), sprintf("n_stab = %d", N_STAB_FIX)),
+      path = final_path
+    )
+    cat(sprintf("\nFinale Tabelle (n_stab=%d) gespeichert: %s\n", N_STAB_FIX, final_path))
+  },
+  error = function(e) cat(sprintf(
+    "\nFinale Tabelle NICHT gespeichert (Datei evtl. geöffnet): %s\n",
+    conditionMessage(e)))
+)
