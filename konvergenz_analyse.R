@@ -386,7 +386,7 @@ tbl_final <- perc |>
 
 hinweis <- data.frame(
   Jahr       = "Hinweis:",
-  Mittelwert = sprintf("Kalibrierungsfaktor = 35,64 / 38,13 = %.6f", KALIB),
+  Mittelwert = gsub("\\.", ",", sprintf("Kalibrierungsfaktor = 35,64 / 38,13 = %.6f", KALIB)),
   KI_unten   = "Abstand Mittelwert - KI_lo (kalibriert, in PP)",
   KI_oben    = "Abstand KI_hi - Mittelwert (kalibriert, in PP)"
 )
