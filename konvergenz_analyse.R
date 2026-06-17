@@ -365,22 +365,35 @@ tryCatch(
 # ── Finale Tabelle: Perzentil-KI & Mittelwert bei einheitlichem n_stab=500 ───
 # (konservativster Stichtag-spezifischer n_stab-Wert aus tbl_nstab)
 N_STAB_FIX <- 500L
+KALIB       <- 35.64 / 38.13   # Kalibrierungsfaktor (Ist-Quote / Simulations-MW 2024)
 
 tbl_final <- perc |>
   filter(n == N_STAB_FIX) |>
   mutate(
-    Jahr        = substr(stichtag, 1, 4),
-    `Perzentil-KI` = gsub("\\.", ",", sprintf("[%.2f; %.2f]", p025 * 100, p975 * 100)),
-    Mittelwert  = gsub("\\.", ",", sprintf("%.2f", mw * 100))
+    Jahr      = substr(stichtag, 1, 4),
+    mw_k      = mw   * 100 * KALIB,
+    lo_k      = p025 * 100 * KALIB,
+    hi_k      = p975 * 100 * KALIB,
+    Mittelwert   = round(mw_k, 2),
+    KI_unten     = round(mw_k - lo_k, 2),   # Abstand nach unten
+    KI_oben      = round(hi_k - mw_k, 2)    # Abstand nach oben
   ) |>
   arrange(Jahr) |>
-  select(Jahr, `Perzentil-KI`, Mittelwert)
+  select(Jahr, Mittelwert, KI_unten, KI_oben)
+
+hinweis <- data.frame(
+  Jahr       = "Hinweis:",
+  Mittelwert = sprintf("Kalibrierungsfaktor = 35,64 / 38,13 = %.6f", KALIB),
+  KI_unten   = "Abstand Mittelwert - KI_lo (kalibriert)",
+  KI_oben    = "Abstand KI_hi - Mittelwert (kalibriert)"
+)
 
 final_path <- file.path(OUT_DIR, "hzp_perc_ki_mittelwerte.xlsx")
 tryCatch(
   {
     write_xlsx(
-      setNames(list(tbl_final), sprintf("n_stab = %d", N_STAB_FIX)),
+      setNames(list(rbind(as.data.frame(tbl_final), hinweis)),
+               sprintf("n_stab = %d", N_STAB_FIX)),
       path = final_path
     )
     cat(sprintf("\nFinale Tabelle (n_stab=%d) gespeichert: %s\n", N_STAB_FIX, final_path))
