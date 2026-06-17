@@ -367,16 +367,22 @@ tryCatch(
 N_STAB_FIX <- 500L
 KALIB       <- 35.64 / 38.13   # Kalibrierungsfaktor (Ist-Quote / Simulations-MW 2024)
 
+fmt <- function(x) gsub("\\.", ",", formatC(x, format = "f", digits = 2))
+
 tbl_final <- perc |>
   filter(n == N_STAB_FIX) |>
   mutate(
     Jahr      = substr(stichtag, 1, 4),
-    mw_k      = mw   * 100 * KALIB,
-    lo_k      = p025 * 100 * KALIB,
-    hi_k      = p975 * 100 * KALIB,
-    Mittelwert   = round(mw_k, 2),
-    KI_unten     = round(mw_k - lo_k, 2),   # Abstand nach unten
-    KI_oben      = round(hi_k - mw_k, 2)    # Abstand nach oben
+    # erst auf 2 NKS runden (konsistent mit anderen BA-Tabellen), dann kalibrieren
+    mw_r      = round(mw   * 100, 2),
+    lo_r      = round(p025 * 100, 2),
+    hi_r      = round(p975 * 100, 2),
+    mw_k      = round(mw_r * KALIB, 2),
+    lo_k      = round(lo_r * KALIB, 2),
+    hi_k      = round(hi_r * KALIB, 2),
+    Mittelwert = fmt(mw_k),
+    KI_unten   = fmt(mw_k - lo_k),   # Abstand nach unten
+    KI_oben    = fmt(hi_k - mw_k)    # Abstand nach oben
   ) |>
   arrange(Jahr) |>
   select(Jahr, Mittelwert, KI_unten, KI_oben)
@@ -384,8 +390,8 @@ tbl_final <- perc |>
 hinweis <- data.frame(
   Jahr       = "Hinweis:",
   Mittelwert = sprintf("Kalibrierungsfaktor = 35,64 / 38,13 = %.6f", KALIB),
-  KI_unten   = "Abstand Mittelwert - KI_lo (kalibriert)",
-  KI_oben    = "Abstand KI_hi - Mittelwert (kalibriert)"
+  KI_unten   = "Abstand Mittelwert - KI_lo (kalibriert, in PP)",
+  KI_oben    = "Abstand KI_hi - Mittelwert (kalibriert, in PP)"
 )
 
 final_path <- file.path(OUT_DIR, "hzp_perc_ki_mittelwerte.xlsx")
