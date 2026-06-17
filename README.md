@@ -65,16 +65,6 @@ Liest die 5.000 Referenzläufe aus Schritt 2 ein und erzeugt daraus:
 - `konvergenz_daten.rds` — Zwischendaten für weitere Auswertungen
 ---
 
-## Voraussetzungen
-
-R-Pakete:
-
-```r
-install.packages(c("tidyverse", "lubridate", "arrow"))
-```
-
----
-
 ## Reproduzierbarkeit
 
 Seeds werden stichtag- und laufspezifisch gesetzt:
